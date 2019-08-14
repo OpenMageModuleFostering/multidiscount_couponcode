@@ -14,7 +14,12 @@
     <models>
       <couponcode>
           <class>Multidiscount_Couponcode_Model</class>
-      </couponcode>         
+      </couponcode>
+      <salesrule>
+        <rewrite>
+          <validator>Multidiscount_Couponcode_Model_SalesRule_Validator</validator>
+        </rewrite>
+      </salesrule>         
     </models>
     <helpers>
       <couponcode>
