@@ -33,7 +33,14 @@
  */
 ?>
 </tbody></table>
-<div class="entity-edit" id="matage-options-panel">
+<?php $_optionsData = $this->getOptionsData();
+if($this->getCurrentOption()=='cart_percent'){
+    $display = 'block';
+}else{
+     $display = 'none';
+    }
+?>
+<div class="entity-edit" id="matage-options-panel" style="display:<?php echo $display; ?>">
         <div class="hor-scroll">
             <table class="dynamic-grid" cellspacing="0"  cellpadding="0">
                 	<tr id="options-table">
@@ -90,11 +97,24 @@ var templateText =
             '<\/td>'+
         '<\/tr>';
 
+var nameArr = [];
+        $$('.dynamic-grid tr.option-row td input').each(
+            function (index) {
+               var res = index.getAttribute("name").match(/delete/i);
+               if(res){
+                   str = index.getAttribute("name").replace("option[delete][option_", "");
+                   str = str.replace("]", "");
+                   nameArr.push(parseInt(str));
+               }
+            }
+        );
+maxNumber = Math.max.apply(Math, nameArr);
+
 var attributeOption = {
     table : $('options-table'),
     templateSyntax : /(^|.|\r|\n)({{(\w+)}})/,
     templateText : templateText,
-    itemCount : <?php echo count($this->getOptionsData()); ?>,
+    itemCount : maxNumber+1,
     totalItems : 0,
     isReadOnly: <?php echo (int)$this->getReadOnly(); ?>,
     add : function(data) {
@@ -103,11 +123,6 @@ var attributeOption = {
         if(!data.id){
             data = {};
             data.id  = 'option_'+this.itemCount;
-            var x = document.getElementsByName("option[value]["+data.id+"][from]").length;
-            if(x){
-                this.itemCount++;
-                data.id  = 'option_'+this.itemCount;
-            }
             isNewOption = true;
         }
         if (!data.intype)
