@@ -136,6 +136,19 @@ class Multidiscount_Couponcode_Model_SalesRule_Validator extends Mage_SalesRule_
                     break;
 
                 case Multidiscount_Couponcode_Model_Percentconst::CART_PERCENT_ACTION:
+                    if (empty($this->_rulesItemTotals[$rule->getId()])) {
+                        Mage::throwException(Mage::helper('salesrule')->__('Item totals are not set for rule.'));
+                    }
+
+                    if ($quote->getIsMultiShipping()) {
+                        $usedForAddressId = $this->getCartFixedRuleUsedForAddress($rule->getId());
+                        if ($usedForAddressId && $usedForAddressId != $address->getId()) {
+                            break;
+                        } else {
+                            $this->setCartFixedRuleUsedForAddress($rule->getId(), $address->getId());
+                        }
+                    }
+                    $cartRules = $address->getCartFixedRules();
                     $percentageData = unserialize($rule->getCartpercentSerialized());
                     $totals = Mage::getSingleton('checkout/session')->getQuote()->getTotals();
                     $quoteAmount = $totals["subtotal"]->getValue();
@@ -145,6 +158,37 @@ class Multidiscount_Couponcode_Model_SalesRule_Validator extends Mage_SalesRule_
                             $discountAmount = $quote->getStore()->roundPrice($discountAmount);
                         }
                     }
+
+                    $cartRules = $address->getCartFixedRules();
+                    if (!isset($cartRules[$rule->getId()])) {
+                        $cartRules[$rule->getId()] = $discountAmount;
+                    }
+
+                    if ($cartRules[$rule->getId()] > 0) {
+                        if ($this->_rulesItemTotals[$rule->getId()]['items_count'] <= 1) {
+                            $quoteAmount = $quote->getStore()->convertPrice($cartRules[$rule->getId()]);
+                            $baseDiscountAmount = min($baseItemPrice * $qty, $cartRules[$rule->getId()]);
+                        } else {
+                            $discountRate = $baseItemPrice * $qty /
+                                $this->_rulesItemTotals[$rule->getId()]['base_items_price'];
+                            $maximumItemDiscount = $discountAmount * $discountRate;
+                            $quoteAmount = $quote->getStore()->convertPrice($maximumItemDiscount);
+
+                            $baseDiscountAmount = min($baseItemPrice * $qty, $maximumItemDiscount);
+                            $this->_rulesItemTotals[$rule->getId()]['items_count']--;
+                        }
+
+                        $discountAmount = min($itemPrice * $qty, $quoteAmount);
+                        $discountAmount = $quote->getStore()->roundPrice($discountAmount);
+                        $baseDiscountAmount = $quote->getStore()->roundPrice($baseDiscountAmount);
+
+                        //get discount for original price
+                        $originalDiscountAmount = min($itemOriginalPrice * $qty, $quoteAmount);
+                        $baseOriginalDiscountAmount = $quote->getStore()->roundPrice($baseItemOriginalPrice);
+
+                        $cartRules[$rule->getId()] -= $baseDiscountAmount;
+                    }
+                    $address->setCartFixedRules($cartRules);
                     break;
 
                 case Mage_SalesRule_Model_Rule::BUY_X_GET_Y_ACTION:
@@ -242,6 +286,55 @@ class Multidiscount_Couponcode_Model_SalesRule_Validator extends Mage_SalesRule_
         $address->setAppliedRuleIds($this->mergeIds($address->getAppliedRuleIds(), $appliedRuleIds));
         $quote->setAppliedRuleIds($this->mergeIds($quote->getAppliedRuleIds(), $appliedRuleIds));
 
+        return $this;
+    }
+
+    /**
+     * Calculate quote totals for each rule and save results
+     *
+     * @param mixed $items
+     * @param Mage_Sales_Model_Quote_Address $address
+     * @return Mage_SalesRule_Model_Validator
+     */
+    public function initTotals($items, Mage_Sales_Model_Quote_Address $address)
+    {
+        $address->setCartFixedRules(array());
+
+        if (!$items) {
+            return $this;
+        }
+
+        foreach ($this->_getRules() as $rule) {
+            if (Mage_SalesRule_Model_Rule::CART_FIXED_ACTION == $rule->getSimpleAction()
+                && $this->_canProcessRule($rule, $address) || Multidiscount_Couponcode_Model_Percentconst::CART_PERCENT_ACTION == $rule->getSimpleAction()
+                && $this->_canProcessRule($rule, $address)) {
+
+                $ruleTotalItemsPrice = 0;
+                $ruleTotalBaseItemsPrice = 0;
+                $validItemsCount = 0;
+
+                foreach ($items as $item) {
+                    //Skipping child items to avoid double calculations
+                    if ($item->getParentItemId()) {
+                        continue;
+                    }
+                    if (!$rule->getActions()->validate($item)) {
+                        continue;
+                    }
+                    $qty = $this->_getItemQty($item, $rule);
+                    $ruleTotalItemsPrice += $this->_getItemPrice($item) * $qty;
+                    $ruleTotalBaseItemsPrice += $this->_getItemBasePrice($item) * $qty;
+                    $validItemsCount++;
+                }
+
+                $this->_rulesItemTotals[$rule->getId()] = array(
+                    'items_price' => $ruleTotalItemsPrice,
+                    'base_items_price' => $ruleTotalBaseItemsPrice,
+                    'items_count' => $validItemsCount,
+                );
+            }
+        }
+        $this->_stopFurtherRules = false;
         return $this;
     }
 }
