@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/Multidiscount_Couponcode",
+    "type": "magento-module",
+    "license": "OSL-v3.0",
+    "homepage": "",
+    "description": "Use same coupon code for multiple discounts based on cart total",
+    "authors": [
+    {
+        "name": "Kingshuk deb",
+        "email": "kingshukdeb88@gmail.com"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
