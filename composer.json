@@ -1,7 +1,7 @@
 {
-    "name": "OpenMageModuleFostering\/Multidiscount_Couponcode",
+    "name": "openmage-module-fostering\/multidiscount_couponcode",
     "type": "magento-module",
-    "license": "OSL-v3.0",
+    "license": "OSL-3.0",
     "homepage": "",
     "description": "Use same coupon code for multiple discounts based on cart total",
     "authors": [
